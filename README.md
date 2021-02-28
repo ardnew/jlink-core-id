@@ -69,7 +69,7 @@ Just add a new element to the `@device` slice (defined at the top of the script)
 Download the script, ensure execute permissions are set, and place it somewhere in `$PATH`:
 
 ```
-wget https://github.com/ardnew/jlink-core-id
+wget https://raw.githubusercontent.com/ardnew/jlink-core-id/main/jlink-core-id
 chmod +x jlink-core-id
 sudo cp jlink-core-id /usr/local/bin
 ```
