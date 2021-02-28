@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my @device = (
+	[ "ATmega328P",      "Metro Mini 328" ],
+	[ "ATSAMD21G18",     "Circuit Playground Express" ],
+	[ "ATSAMD21G18",     "Hallowing M0 Express" ],
+	[ "ATSAMD21G18",     "ItsyBitsy M0 Express" ],
+	[ "ATSAMD21E18",     "Gemma M0" ],
+	[ "ATSAMD21E18",     "Trinket M0" ],
+	[ "ATSAMD51G19",     "ItsyBitsy M4 Express" ],
+	[ "ATSAMD51J19",     "Feather M4 Express" ],
+	[ "ATSAMD51J19",     "Matrix Portal M4" ],
+	[ "ATSAMD51J20",     "PyPortal" ],
+	[ "ATSAMD51P20",     "Grand Central M4 Express" ],
+	[ "STM32F405RG",     "Feather STM32F405 Express" ],
+	[ "MIMXRT1062xxx6A", "MIMXRT1062-EVK" ],
+);
+
+# ------------------------------------------------------------------------------
+
+sub max { $_[0] > $_[1] ? $_[0] : $_[1] }
+
+# maximize returns a sub closure over a variable that keeps the maximum value
+# among all arguments with which it was invoked. 
+# Calling the sub without any argument will return its current maximum.
+sub maximize {
+	my $max = (shift); 
+	sub { $max = max($max, (shift)) if @_ > 0; $max }
+}
+
+# maxlength returns the maximum string length among all string arguments.
+sub maxlength {
+	my $len = maximize(0);
+	$len->(length) for @_;
+	$len->()
+}
+
+# norm removes all whitespace and escapes any regexp control symbols from a 
+# given string.
+sub norm { $_ = (shift); s/\s//g; quotemeta }
+
+my $corelen = maxlength(map { ${$_}[0] } @device);
+
+# ------------------------------------------------------------------------------
+
+my ($input, @match);
+
+# retrieve user input from command-line if provided. otherwise, print the known
+# devices and read input from stdin.
+if (@ARGV == 0) {
+	printf STDERR "known devices:\n";
+	printf STDERR "  %-*s (%s)\n", $corelen, ${$_}[0], ${$_}[1] for @device;
+	printf "\ntarget device or CPU core (or <return> to quit):\n=> ";
+	$_ = <>; s/^\s*|\s*$//g;
+	die "quitting (no input)\n" unless /\w/;
+	$input = $_;
+}
+else {
+	$input = "@ARGV";
+}
+
+# normalize input for comparison to known devices.
+my $provided = $input;
+$input = norm($input);
+
+# compare input to both core and target name of all known devices, pushing all
+# matches to a separate slice.
+for my $d (@device) {
+	push @match, $d 
+		if norm(${$d}[0]) =~ /$input/i or norm(${$d}[1]) =~ /$input/i;
+}
+
+# check how many matches we generated. the only valid number of matches is 1.
+if (@match == 1) {
+	@_ = @{$match[0]};
+	printf STDERR "selected %s (%s)\n", $_[1], $_[0];
+	print "$_[0]\n"
+}
+else {
+	# we generated either 0 matches or greater than 1 matches.
+	if (@match > 1) {
+		$corelen = maxlength(map { ${$_}[0] } @match);
+		printf STDERR "multiple devices found:\n";
+		printf STDERR "  %-*s (%s)\n", $corelen, ${$_}[0], ${$_}[1] for @match;
+		die "error: too many devices: $provided\n";
+	}
+	else {
+		die "error: device not found: $provided\n";
+	}
+}
+
