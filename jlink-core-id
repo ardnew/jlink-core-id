@@ -3,6 +3,9 @@
 use strict;
 use warnings;
 
+# values at index > 1 are aliases or other identifiers for a given device. these
+# will not appear when printing known devices, but they will be matched against
+# user input when searching for the desired device.
 my @device = (
 	[ "ATmega328P",      "Metro Mini 328" ],
 	[ "ATSAMD21G18",     "Circuit Playground Express" ],
@@ -14,9 +17,13 @@ my @device = (
 	[ "ATSAMD51J19",     "Feather M4 Express" ],
 	[ "ATSAMD51J19",     "Matrix Portal M4" ],
 	[ "ATSAMD51J20",     "PyPortal" ],
-	[ "ATSAMD51P20",     "Grand Central M4 Express" ],
+	[ "ATSAMD51P20",     "Grand Central M4 Express", "grandcentral-m4" ],
+  [ "nRF52840_xxAA",   "Particle Argon" ],
 	[ "STM32F405RG",     "Feather STM32F405 Express" ],
 	[ "MIMXRT1062xxx6A", "MIMXRT1062-EVK" ],
+	[ "MIMXRT1062xxx6A", "Teensy 4", "teensy40", "teensy41" ],
+  [ "STM32H747XI_M4",  "Portenta (M4 core)" ],
+  [ "STM32H747XI_M7",  "Portenta (M7 core)" ],
 );
 
 # ------------------------------------------------------------------------------
@@ -52,7 +59,7 @@ my ($input, @match);
 # devices and read input from stdin.
 if (@ARGV == 0) {
 	printf STDERR "known devices:\n";
-	printf STDERR "  %-*s (%s)\n", $corelen, ${$_}[0], ${$_}[1] for @device;
+	printf STDERR "  %-*s (%s)\n", $corelen, ${$_}[0], @{$_}[1] for @device;
 	printf "\ntarget device or CPU core (or <return> to quit):\n=> ";
 	$_ = <>; s/^\s*|\s*$//g;
 	die "quitting (no input)\n" unless /\w/;
@@ -66,11 +73,23 @@ else {
 my $provided = $input;
 $input = norm($input);
 
+sub keep {
+  my $match = (shift);
+  my %keep;
+  sub { 
+    push @{$match}, ($keep{${$_[0]}[0]} = $_[0]) 
+      if @_ > 0 and not exists $keep{${$_[0]}[0]};
+    @{$match}
+  }
+}
+
+my $keeper = keep(\@match);
 # compare input to both core and target name of all known devices, pushing all
 # matches to a separate slice.
 for my $d (@device) {
-	push @match, $d 
-		if norm(${$d}[0]) =~ /$input/i or norm(${$d}[1]) =~ /$input/i;
+	$keeper->($d)
+    #if norm(${$d}[0]) =~ /$input/i or norm(${$d}[1]) =~ /$input/i;
+    if grep { norm($_) =~ /$input/i or norm($_) eq $input } @{$d};
 }
 
 # check how many matches we generated. the only valid number of matches is 1.
